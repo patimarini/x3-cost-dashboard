@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CA115-0100-901 — Painel de Custo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #1D9E75;
+      --green-d: #0F6E56;
+      --green-bg:#EAF3DE;
+      --green-t: #3B6D11;
+      --green-b: #97C459;
+      --purple:  #7F77DD;
+      --purple-d:#534AB7;
+      --orange:  #D85A30;
+      --orange-d:#993C1D;
+      --orange-bg:#FAECE7;
+      --orange-t: #993C1D;
+      --orange-b: #F0997B;
+      --bg:      #F7F6F3;
+      --surface: #FFFFFF;
+      --border:  #E5E3DE;
+      --text:    #1A1917;
+      --muted:   #6B6963;
+      --mono:    'Courier New', monospace;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .page { max-width: 900px; margin: 0 auto; }
+
+    /* Header */
+    header { margin-bottom: 2rem; }
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .4rem;
+    }
+    h1 {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: .4rem;
+    }
+
+    /* KPI cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      margin-bottom: .35rem;
+    }
+    .kpi-value {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .kpi-pct {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: .2rem;
+    }
+    .kpi.total { border-left: 3px solid var(--text); }
+    .kpi.mat   { border-left: 3px solid var(--green); }
+    .kpi.labor { border-left: 3px solid var(--purple); }
+    .kpi.svc   { border-left: 3px solid var(--orange); }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Charts */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+    @media (max-width: 560px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .chart-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .chart-wrap { position: relative; height: 240px; }
+
+    /* Zero items table */
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .75rem;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .warn-icon {
+      width: 16px;
+      height: 16px;
+      background: var(--orange);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .warn-icon svg { display: block; }
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: #F0EEEA; }
+    th {
+      text-align: left;
+      padding: 9px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    th.right, td.right { text-align: right; }
+    td { padding: 8px 14px; border-top: 1px solid var(--border); color: var(--text); }
+    tr:hover td { background: #F7F6F3; }
+    .code { font-family: var(--mono); font-size: 12px; }
+    .desc { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge-mat  { background: var(--green-bg);  color: var(--green-t);  border-color: var(--green-b); }
+    .badge-svc  { background: var(--orange-bg); color: var(--orange-t); border-color: var(--orange-b); }
+    .zero-val { font-weight: 600; color: var(--orange); }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <p class="eyebrow">Análise de custo · Sage X3</p>
+    <h1>CA115-0100-901</h1>
+    <p class="subtitle">PENEIRA HIGH-FREQUENCY 6X20 4 DECKS — Custo total consolidado por categoria (coluna R)</p>
+  </header>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi mat">
+      <p class="kpi-label">Raw material</p>
+      <p class="kpi-value">R$ 187.957</p>
+      <p class="kpi-pct">47,0% do total</p>
+    </div>
+    <div class="kpi labor">
+      <p class="kpi-label">Labor</p>
+      <p class="kpi-value">R$ 195.783</p>
+      <p class="kpi-pct">48,9% do total</p>
+    </div>
+    <div class="kpi svc">
+      <p class="kpi-label">Services</p>
+      <p class="kpi-value">R$ 16.407</p>
+      <p class="kpi-pct">4,1% do total</p>
+    </div>
+    <div class="kpi total">
+      <p class="kpi-label">Total</p>
+      <p class="kpi-value">R$ 400.147</p>
+      <p class="kpi-pct">BR_MATPRIM + NULL + BR_INDUSTR</p>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <span><span class="dot" style="background:var(--green)"></span>Raw material (BR_MATPRIM)</span>
+    <span><span class="dot" style="background:var(--purple)"></span>Labor (NULL)</span>
+    <span><span class="dot" style="background:var(--orange)"></span>Services (BR_INDUSTR)</span>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-box">
+      <p class="chart-title">Distribuição</p>
+      <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <p class="chart-title">Comparativo</p>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Zero items -->
+  <p class="section-title">
+    <span class="warn-icon" aria-hidden="true">
+      <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+        <path d="M4 1v3M4 6h.01" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </span>
+    Itens com custo zerado — coluna R = 0
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Descrição</th>
+          <th>Acc code</th>
+          <th class="right">Custo R</th>
+        </tr>
+      </thead>
+      <tbody id="zeroTbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const labels = ['Raw material', 'Labor', 'Services'];
+const values = [187957, 195783, 16407];
+const total  = 400147;
+const colors = ['#1D9E75','#7F77DD','#D85A30'];
+const bdrClr = ['#0F6E56','#534AB7','#993C1D'];
+
+// Donut
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: bdrClr, borderWidth: 1.5, hoverOffset: 6 }] },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '62%',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` R$ ${ctx.raw.toLocaleString('pt-BR')} (${((ctx.raw/total)*100).toFixed(1)}%)` } }
+    }
+  }
+});
+
+// Bar
+new Chart(document.getElementById('barChart'), {
+  type: 'bar',
+  data: { labels, datasets: [{ label: 'Custo (R$)', data: values, backgroundColor: colors, borderColor: bdrClr, borderWidth: 1.5, borderRadius: 5 }] },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` R$ ${ctx.raw.toLocaleString('pt-BR')}` } } },
+    scales: {
+      x: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 }, color: '#888', callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
+      y: { grid: { display: false }, ticks: { font: { size: 13 } } }
+    }
+  }
+});
+
+// Zero items table
+const rows = [
+  { code: '02PQ000028', desc: 'COMPOSTO BORRACHA',               acc: 'BR_MATPRIM' },
+  { code: '02PQ000028', desc: 'COMPOSTO BORRACHA',               acc: 'BR_MATPRIM' },
+  { code: '03SE000002', desc: 'SERVIÇO DE INDUSTRIALIZAÇÃO',     acc: 'BR_INDUSTR' },
+  { code: '03SE000002', desc: 'SERVIÇO DE INDUSTRIALIZAÇÃO',     acc: 'BR_INDUSTR' },
+  { code: '03SS000869', desc: 'SERVIÇO GALVANIZAÇÃO HFF-DSA1-4', acc: 'BR_INDUSTR' },
+  { code: '03SS000867', desc: 'SERVIÇO GALVANIZAÇÃO HFF-DSA1-3', acc: 'BR_INDUSTR' },
+  { code: '03SS000865', desc: 'SERVIÇO GALVANIZAÇÃO HFF-DSA1-1', acc: 'BR_INDUSTR' },
+  { code: '03SS000869', desc: 'SERVIÇO GALVANIZAÇÃO HFF-DSA1-4', acc: 'BR_INDUSTR' },
+  { code: '03SS000867', desc: 'SERVIÇO GALVANIZAÇÃO HFF-DSA1-3', acc: 'BR_INDUSTR' },
+  { code: '03SS000865', desc: 'SERVIÇO GALVANIZAÇÃO HFF-DSA1-1', acc: 'BR_INDUSTR' },
+];
+
+const tbody = document.getElementById('zeroTbody');
+rows.forEach(r => {
+  const tr = document.createElement('tr');
+  const badgeClass = r.acc === 'BR_MATPRIM' ? 'badge-mat' : 'badge-svc';
+  tr.innerHTML = `
+    <td class="code">${r.code}</td>
+    <td class="desc" title="${r.desc}">${r.desc}</td>
+    <td><span class="badge ${badgeClass}">${r.acc}</span></td>
+    <td class="right zero-val">R$ 0,00</td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>
