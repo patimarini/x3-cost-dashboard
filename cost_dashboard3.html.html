@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sage X3 — Painel de Custo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green:     #1D9E75; --green-d:  #0F6E56;
+      --green-bg:  #EAF3DE; --green-t:  #3B6D11; --green-b: #97C459;
+      --purple:    #7F77DD; --purple-d: #534AB7;
+      --orange:    #D85A30; --orange-d: #993C1D;
+      --orange-bg: #FAECE7; --orange-t: #993C1D; --orange-b: #F0997B;
+      --bg:        #F7F6F3; --surface:  #FFFFFF;
+      --border:    #E5E3DE; --text:     #1A1917; --muted:    #6B6963;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem 4rem; }
+    .page { max-width: 960px; margin: 0 auto; }
+
+    /* Upload */
+    #uploadSection { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 1rem; }
+    .upload-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .upload-title { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 600; text-align: center; }
+    .upload-sub { font-size: 13px; color: var(--muted); text-align: center; max-width: 460px; line-height: 1.6; }
+    .drop-zone { width: 100%; max-width: 480px; border: 2px dashed var(--border); border-radius: 14px; padding: 2.5rem 2rem; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; background: var(--surface); }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--green); background: var(--green-bg); }
+    .drop-icon { font-size: 2.5rem; margin-bottom: .75rem; display: block; }
+    .drop-label { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: .35rem; }
+    .drop-hint { font-size: 12px; color: var(--muted); }
+    #fileInput { display: none; }
+    .upload-error { font-size: 13px; color: var(--orange); font-weight: 500; text-align: center; max-width: 480px; }
+
+    /* Dashboard */
+    #dashboard { display: none; }
+    header { margin-bottom: 2rem; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+    .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; }
+    h1 { font-size: clamp(1.3rem, 2.5vw, 1.8rem); font-weight: 600; line-height: 1.2; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-top: .3rem; }
+    .btn-reset { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 6px 14px; cursor: pointer; transition: color .15s, border-color .15s; white-space: nowrap; flex-shrink: 0; }
+    .btn-reset:hover { color: var(--text); border-color: #aaa; }
+
+    /* KPIs */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 2rem; }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-left-width: 3px; border-radius: 10px; padding: 1rem 1.1rem; }
+    .kpi.mat   { border-left-color: var(--green); }
+    .kpi.labor { border-left-color: var(--purple); }
+    .kpi.svc   { border-left-color: var(--orange); }
+    .kpi.total { border-left-color: var(--text); }
+    .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: .35rem; }
+    .kpi-value { font-size: 1.25rem; font-weight: 600; white-space: nowrap; }
+    .kpi-pct   { font-size: 12px; color: var(--muted); margin-top: .2rem; }
+
+    /* Legend */
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; display: inline-block; }
+
+    /* Charts */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2.5rem; }
+    @media (max-width: 560px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .chart-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 1rem; }
+    .chart-wrap { position: relative; height: 240px; }
+
+    /* Table */
+    .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: .75rem; display: flex; align-items: center; gap: 7px; }
+    .warn-dot { width: 16px; height: 16px; background: var(--orange); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: #F0EEEA; }
+    th { text-align: left; padding: 9px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); white-space: nowrap; }
+    th.right, td.right { text-align: right; }
+    td { padding: 8px 14px; border-top: 1px solid var(--border); }
+    tr:hover td { background: #F7F6F3; }
+    .code { font-family: 'Courier New', monospace; font-size: 12px; }
+    .desc-cell { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge-mat { background: var(--green-bg); color: var(--green-t); border-color: var(--green-b); }
+    .badge-svc { background: var(--orange-bg); color: var(--orange-t); border-color: var(--orange-b); }
+    .zero-val  { font-weight: 600; color: var(--orange); }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Upload -->
+  <section id="uploadSection">
+    <p class="upload-eyebrow">Sage X3 · Análise de custo</p>
+    <h1 class="upload-title">Painel de Estrutura de Produto</h1>
+    <p class="upload-sub">Faça o upload do arquivo CSV exportado do Sage X3.<br>
+      O arquivo deve conter a coluna <strong>Filho Acc Code</strong> e a coluna <strong>Custo</strong> (separador <strong>;</strong>).</p>
+    <div class="drop-zone" id="dropZone">
+      <span class="drop-icon">📂</span>
+      <p class="drop-label">Arraste o arquivo CSV aqui</p>
+      <p class="drop-hint">ou clique para selecionar</p>
+    </div>
+    <p class="upload-error" id="uploadError" style="display:none;"></p>
+    <input type="file" id="fileInput" accept=".csv" />
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dashboard">
+    <header>
+      <div>
+        <p class="eyebrow">Análise de custo · Sage X3</p>
+        <h1 id="hdrTitle">—</h1>
+        <p class="subtitle" id="hdrSub">—</p>
+      </div>
+      <button class="btn-reset" id="btnReset">↩ Novo arquivo</button>
+    </header>
+
+    <div class="kpi-grid">
+      <div class="kpi mat">
+        <p class="kpi-label">Raw material</p>
+        <p class="kpi-value" id="kpiMat">—</p>
+        <p class="kpi-pct" id="kpiMatPct">—</p>
+      </div>
+      <div class="kpi labor">
+        <p class="kpi-label">Labor</p>
+        <p class="kpi-value" id="kpiLabor">—</p>
+        <p class="kpi-pct" id="kpiLaborPct">—</p>
+      </div>
+      <div class="kpi svc">
+        <p class="kpi-label">Services</p>
+        <p class="kpi-value" id="kpiSvc">—</p>
+        <p class="kpi-pct" id="kpiSvcPct">—</p>
+      </div>
+      <div class="kpi total">
+        <p class="kpi-label">Total</p>
+        <p class="kpi-value" id="kpiTotal">—</p>
+        <p class="kpi-pct" id="kpiTotalPct">—</p>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><span class="dot" style="background:var(--green)"></span>Raw material (BR_MATPRIM, BR_MTUSSTK)</span>
+      <span><span class="dot" style="background:var(--purple)"></span>Labor (NULL / sem acc code)</span>
+      <span><span class="dot" style="background:var(--orange)"></span>Services (BR_INDUSTR)</span>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-box">
+        <p class="chart-title">Distribuição</p>
+        <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <p class="chart-title">Comparativo</p>
+        <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+      <p class="section-title" style="margin-bottom:0;">
+        <span class="warn-dot" aria-hidden="true">
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <path d="M4 1v3M4 6h.01" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </span>
+        Itens com custo zerado — coluna Custo = 0
+      </p>
+      <button class="btn-reset" id="btnExport" style="display:none;">⬇ Exportar CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Descrição</th>
+            <th>Acc code</th>
+            <th class="right">Custo</th>
+          </tr>
+        </thead>
+        <tbody id="zeroTbody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+let donutInst = null, barInst = null;
+
+const fmt = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+
+// ── Parse number in Brazilian format (1.234,56 → 1234.56) ──
+function parseBR(val) {
+  if (val === null || val === undefined) return 0;
+  const s = String(val).trim();
+  if (s === '' || s.toUpperCase() === 'NULL') return 0;
+  // Remove thousand separators (dots), replace comma decimal
+  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+// ── Detect encoding: try UTF-8, fall back to latin1 via escape ──
+function decodeCSV(buffer) {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer);
+  }
+}
+
+// ── Parse CSV respecting quoted fields ──
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  return lines.map(line => {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ';' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  });
+}
+
+// ── Column name → index map ──
+function colMap(headers) {
+  const m = {};
+  headers.forEach((h, i) => { m[h.trim()] = i; });
+  return m;
+}
+
+// ── Services acc codes ──
+const SVC_CODES = new Set(['BR_INDUSTR']);
+const EXCLUDE   = new Set(['BR_PSA', 'BR_PPS']);
+
+function analyse(rows) {
+  // Detect if first row is a header (contains known column name)
+  const firstRow = rows[0];
+  let headers = null;
+  let dataRows = rows;
+
+  const knownCols = ['Filho Acc Code', 'Filho Acc code', 'filho acc code', 'ACC CODE', 'Custo'];
+  const isHeader = knownCols.some(k => firstRow.some(c => c.trim().toLowerCase() === k.toLowerCase()));
+
+  if (isHeader) {
+    headers = firstRow;
+    dataRows = rows.slice(1);
+  }
+
+  // Build column index map
+  let iOrigem = 0, iFilho = 6, iFilhoDesc = 7, iAcc = 8, iCusto = 17;
+
+  if (headers) {
+    const m = colMap(headers);
+    iOrigem   = m['Origem']           ?? m['origem']            ?? 0;
+    iFilho    = m['Filho']            ?? m['filho']             ?? 6;
+    iFilhoDesc= m['Filho Descrição']  ?? m['Filho Descricao']   ?? m['Filho Desc'] ?? 7;
+    iAcc      = m['Filho Acc Code']   ?? m['Filho Acc code']    ?? m['ACC CODE']   ?? 8;
+    iCusto    = m['Custo']            ?? m['CUSTO']             ?? 17;
+  }
+
+  let matTotal = 0, laborTotal = 0, svcTotal = 0;
+  const zeroMap = new Map();
+
+  // Product info from first data row
+  const productCode = (dataRows[0]?.[iOrigem] ?? '').trim() || '—';
+  const productDesc = headers
+    ? (dataRows[0]?.[ colMap(headers)['Pai Descrição'] ?? colMap(headers)['Pai Descricao'] ?? 2 ] ?? '').trim()
+    : (dataRows[0]?.[2] ?? '').trim();
+
+  dataRows.forEach(r => {
+    const acc  = (r[iAcc] ?? '').trim().replace(/^NULL$/i, '');
+    const cost = parseBR(r[iCusto]);
+
+    if (EXCLUDE.has(acc)) return;
+
+    if (acc === 'BR_MATPRIM' || acc === 'BR_MTUSSTK') {
+      matTotal += cost;
+      if (cost === 0) {
+        const key = (r[iFilho] ?? '').trim() + '|BR_MATPRIM';
+        if (!zeroMap.has(key)) zeroMap.set(key, { code: (r[iFilho] ?? '').trim(), desc: (r[iFilhoDesc] ?? '').trim(), acc: 'BR_MATPRIM' });
+      }
+    } else if (SVC_CODES.has(acc)) {
+      svcTotal += cost;
+      if (cost === 0) {
+        const key = (r[iFilho] ?? '').trim() + '|' + acc;
+        if (!zeroMap.has(key)) zeroMap.set(key, { code: (r[iFilho] ?? '').trim(), desc: (r[iFilhoDesc] ?? '').trim(), acc });
+      }
+    } else if (acc === '') {
+      laborTotal += cost;
+    }
+  });
+
+  return { productCode, productDesc, matTotal, laborTotal, svcTotal, zeroItems: [...zeroMap.values()] };
+}
+
+function render({ productCode, productDesc, matTotal, laborTotal, svcTotal, zeroItems }) {
+  const grand = matTotal + laborTotal + svcTotal;
+  const pct = v => grand > 0 ? ((v / grand) * 100).toFixed(1) + '% do total' : '—';
+
+  document.getElementById('hdrTitle').textContent    = productCode;
+  document.getElementById('hdrSub').textContent      = productDesc;
+  document.getElementById('kpiMat').textContent      = fmt(matTotal);
+  document.getElementById('kpiMatPct').textContent   = pct(matTotal);
+  document.getElementById('kpiLabor').textContent    = fmt(laborTotal);
+  document.getElementById('kpiLaborPct').textContent = pct(laborTotal);
+  document.getElementById('kpiSvc').textContent      = fmt(svcTotal);
+  document.getElementById('kpiSvcPct').textContent   = pct(svcTotal);
+  document.getElementById('kpiTotal').textContent    = fmt(grand);
+  document.getElementById('kpiTotalPct').textContent = '';
+
+  const labels = ['Raw material', 'Labor', 'Services'];
+  const values = [matTotal, laborTotal, svcTotal];
+  const colors = ['#1D9E75', '#7F77DD', '#D85A30'];
+  const bdrClr = ['#0F6E56', '#534AB7', '#993C1D'];
+
+  if (donutInst) donutInst.destroy();
+  if (barInst)   barInst.destroy();
+
+  donutInst = new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: bdrClr, borderWidth: 1.5, hoverOffset: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.raw)} (${grand > 0 ? ((ctx.raw/grand)*100).toFixed(1) : 0}%)` } }
+      }
+    }
+  });
+
+  barInst = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Custo', data: values, backgroundColor: colors, borderColor: bdrClr, borderWidth: 1.5, borderRadius: 5 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.raw)}` } } },
+      scales: {
+        x: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 }, color: '#888', callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
+        y: { grid: { display: false }, ticks: { font: { size: 13 } } }
+      }
+    }
+  });
+
+  const tbody = document.getElementById('zeroTbody');
+  const btnExport = document.getElementById('btnExport');
+  tbody.innerHTML = '';
+
+  if (zeroItems.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:1.5rem;font-size:13px;">Nenhum item com custo zerado encontrado ✓</td></tr>';
+    btnExport.style.display = 'none';
+  } else {
+    zeroItems.forEach(it => {
+      const tr = document.createElement('tr');
+      const badge = (it.acc === 'BR_MATPRIM' || it.acc === 'BR_MTUSSTK') ? 'badge-mat' : 'badge-svc';
+      tr.innerHTML = `<td class="code">${it.code}</td><td class="desc-cell" title="${it.desc}">${it.desc}</td><td><span class="badge ${badge}">${it.acc}</span></td><td class="right zero-val">R$ 0,00</td>`;
+      tbody.appendChild(tr);
+    });
+    btnExport.style.display = 'inline-flex';
+
+    // Export handler (replace each render to avoid stacking listeners)
+    btnExport.onclick = () => {
+      const header = 'Código;Descrição;Acc Code;Custo\n';
+      const csvContent = header + zeroItems.map(it =>
+        `${it.code};"${it.desc.replace(/"/g,'""')}";${it.acc};0`
+      ).join('\n');
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `itens_zerados_${productCode}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
+
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('dashboard').style.display     = 'block';
+}
+
+function handleFile(file) {
+  const errEl = document.getElementById('uploadError');
+  errEl.style.display = 'none';
+  if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+    errEl.textContent = 'Por favor, selecione um arquivo .csv';
+    errEl.style.display = 'block';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = decodeCSV(e.target.result);
+      const rows = parseCSV(text);
+      if (rows.length < 2) throw new Error('Arquivo sem dados suficientes.');
+      render(analyse(rows));
+    } catch (err) {
+      errEl.textContent = 'Erro ao processar: ' + err.message;
+      errEl.style.display = 'block';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+document.getElementById('btnReset').addEventListener('click', () => {
+  fileInput.value = '';
+  document.getElementById('dashboard').style.display     = 'none';
+  document.getElementById('uploadSection').style.display = 'flex';
+});
+</script>
+</body>
+</html>
